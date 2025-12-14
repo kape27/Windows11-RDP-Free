@@ -10,27 +10,32 @@ jobs:
     steps:
     - name: Downloading & Installing Essentials
       run: |
-        choco install -y ngrok putty
+        choco install -y ngrok
         
-    - name: Setting up Tailscale
-      run: |
-        curl -fsSL https://tailscale.com/install.sh | sh
-        tailscale up --authkey=${{ secrets.TS_AUTHKEY }}
-        
-    - name: Enable RDP & Configure
+    - name: Enable RDP Access
       run: |
         # Enable RDP
-        Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -name "fDenyTSConnections" -Value 0
-        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0 -Force
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop" -ErrorAction SilentlyContinue
         
         # Enable MultiUser Session
-        Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server\\WinStations\\RDP-Tcp' -name "UserAuthentication" -Value 1
-        Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Services\\TermService' -Name "Type" -Value 1
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1 -Force
         
-    - name: Get IP Address
+    - name: Setup Tailscale with Auth Key
+      env:
+        TS_AUTH_KEY: ${{ secrets.TS_AUTHKEY }}
       run: |
-        echo "Your RDP IP: " + (Get-NetIPAddress -InterfaceAlias "Tailscale" | Select-Object -ExpandProperty IPAddress)
+        choco install -y tailscale
+        & 'C:\Program Files\Tailscale\tailscale.exe' up --authkey=$env:TS_AUTH_KEY --accept-dns=false
         
-    - name: Keep Server Alive
+    - name: Get RDP Connection Details
       run: |
-        while ($true) { Start-Sleep -Seconds 3600 }
+        echo "RDP Setup Complete!"
+        echo "Getting Tailscale IP..."
+        & 'C:\Program Files\Tailscale\tailscale.exe' ip -4
+        
+    - name: Maintain RDP Connection
+      run: |
+        while ($true) { 
+          Start-Sleep -Seconds 300
+        }
